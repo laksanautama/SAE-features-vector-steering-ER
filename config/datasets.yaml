@@ -1,0 +1,116 @@
+# ═══════════════════════════════════════════════════════════════
+# Dataset Registry — one entry per language
+# ═══════════════════════════════════════════════════════════════
+
+languages:
+  indonesia:
+    hf_dataset_id: brighter-dataset/BRIGHTER-emotion-categories
+    hf_subset: ind
+    text_column: text
+    emotion_classes:
+      - anger
+      - disgust
+      - fear
+      - joy
+      - sadness
+      - surprise
+      - neutral
+  javanese:
+    hf_dataset_id: brighter-dataset/BRIGHTER-emotion-categories
+    hf_subset: jav
+    text_column: text
+    emotion_classes:
+      - anger
+      - disgust
+      - fear
+      - joy
+      - sadness
+      - surprise
+      - neutral
+  sundanese:
+    hf_dataset_id: brighter-dataset/BRIGHTER-emotion-categories
+    hf_subset: sun
+    text_column: text
+    emotion_classes:
+      - anger
+      - disgust
+      - fear
+      - joy
+      - sadness
+      - surprise
+      - neutral
+  afrikaans:
+    hf_dataset_id: brighter-dataset/BRIGHTER-emotion-categories
+    hf_subset: afr
+    text_column: text
+    emotion_classes:
+      - anger
+      - disgust
+      - fear
+      - joy
+      - sadness
+      - surprise
+      - neutral
+  yoruba:
+    hf_dataset_id: brighter-dataset/BRIGHTER-emotion-categories
+    hf_subset: yor
+    text_column: text
+    emotion_classes:
+      - anger
+      - disgust
+      - fear
+      - joy
+      - sadness
+      - surprise
+      - neutral
+  isiZulu:
+    hf_dataset_id: brighter-dataset/BRIGHTER-emotion-categories
+    hf_subset: zul
+    text_column: text
+    emotion_classes:
+      - anger
+      - disgust
+      - fear
+      - joy
+      - sadness
+      - surprise
+      - neutral
+
+
+
+# ── SP-1 parameters ──────────────────────────────────────────
+sp1:
+  encoder_model: all-MiniLM-L6-v2
+  epsilon: 0.30
+  max_train_samples: 500
+  max_eval_samples: 100
+
+# ── Classifier-based SP-1 parameters ─────────────────────────
+classifier_selection:
+  max_texts: 500
+  max_seq_len: 128
+  batch_size: 4
+  pool_method: max
+  binarize_threshold: 0.0
+  classifier_C: 0.1
+  min_weight: 0.0001
+  min_features: 10
+
+# ── Layer probing parameters ─────────────────────────────────
+probing:
+  max_train_samples: 300
+  max_eval_samples: 100
+  max_seq_len: 128
+  batch_size: 8
+
+# ── SP-2 training parameters ─────────────────────────────────
+sp2:
+  lr: 0.005
+  lambda_l1: 0.0001
+  tau: 0.01
+  n_epochs: 50
+  patience: 10
+  batch_size: 4
+  max_train_samples: 500
+  max_eval_samples: 100
+  max_seq_len: 128
