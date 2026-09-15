@@ -50,7 +50,7 @@ python scripts/run_layer_probing.py --language indonesia
 python scripts/run_sp1_semantic.py --language indonesia
 
 # 3. Activation-based feature selection
-python scripts/run_sp1_activation.py --language indonesia
+python scripts/run_sp1_classifier.py --language indonesia
 
 # 4. Coefficient optimisation (SP-2)
 python scripts/run_sp2_optimization.py --language indonesia
