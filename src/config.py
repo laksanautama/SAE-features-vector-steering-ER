@@ -27,7 +27,7 @@ def hf_login():
     if _hf_logged_in:
         return
 
-    from huggingface_hub import login, HfFolder
+    from huggingface_hub import login, get_token
 
     # 1. Env variable
     token = os.environ.get("HF_TOKEN")
@@ -42,7 +42,7 @@ def hf_login():
 
     # 3. Existing cache
     if not token:
-        cached = HfFolder.get_token()
+        cached = get_token()
         if cached:
             print("  HF auth: using cached token from huggingface-cli login")
             _hf_logged_in = True
