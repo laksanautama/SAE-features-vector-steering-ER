@@ -22,7 +22,7 @@ emotion-sae-steering/
 ├── scripts/
 │   ├── run_layer_probing.py   # Module 1: Layer probing
 │   ├── run_sp1_semantic.py    # Module 2: Semantic feature selection
-│   ├── run_sp1_activation.py  # Module 3: Activation-based feature selection
+│   ├── run_sp1_classifier.py  # Module 3: Classifier-based feature selection
 │   ├── run_sp2_optimization.py # Module 4: Coefficient optimisation
 │   └── run_analysis.py        # Module 5: Analysis & ablation
 ├── outputs/                   # Auto-created results directory
@@ -49,8 +49,8 @@ python scripts/run_layer_probing.py --language indonesia
 # 2. Semantic feature selection (SP-1)
 python scripts/run_sp1_semantic.py --language indonesia
 
-# 3. Activation-based feature selection
-python scripts/run_sp1_activation.py --language indonesia
+# 3. Classifier-based feature selection
+python scripts/run_sp1_classifier.py --language indonesia
 
 # 4. Coefficient optimisation (SP-2)
 python scripts/run_sp2_optimization.py --language indonesia
