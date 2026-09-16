@@ -20,7 +20,8 @@ from sentence_transformers import SentenceTransformer
 import sys; sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src.config import (load_experiment_config, load_dataset_registry, get_model_config,
                          get_sae_id, get_width_config, model_slug, resolve_output_dir,
-                         resolve_layers, get_layer_emotion_map, hf_login)
+                         resolve_layers, get_layer_emotion_map, resolve_sae_explns_dir,
+                         hf_login)
 from src.data import load_emotion_dataset
 from src.utils import save_json, ensure_dir
 
@@ -74,7 +75,7 @@ def run_sp1_for_config(model_id, width, language, data_config, exp_config, mode)
 
     emotion_classes = data_config["emotion_classes"]
     base_dir = resolve_output_dir(exp_config["output_dir"], model_id, width, language)
-    sae_expl_dir = base_dir / "sae_explanations"
+    sae_expl_dir = resolve_sae_explns_dir(exp_config["output_dir"], model_id, width)
 
     # Resolve layers
     unique_layers, lem, _ = resolve_layers(model_id, mode)

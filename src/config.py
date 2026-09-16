@@ -20,7 +20,6 @@ def hf_login():
       1. HF_TOKEN environment variable  (preferred — no secrets in files)
       2. hf_token field in experiment.yaml
       3. Existing huggingface-cli login cache (~/.cache/huggingface/token)
-      4. Removing the deprecated HFfolder
 
     Call this at the top of every script's main(). Subsequent calls are no-ops.
     """
@@ -172,6 +171,17 @@ def resolve_output_dir(base_dir: str, model_id: str, width: str, language: str) 
     slug = model_slug(model_id)
     lang = language.lower().replace(" ", "_")
     return Path(base_dir) / slug / width / lang
+
+
+def resolve_sae_explns_dir(base_dir: str, model_id: str, width: str) -> Path:
+    """
+    Resolve the SAE explanations directory.
+
+    Explanations are model+width specific, NOT language specific:
+        {output_dir}/{model_slug}/{width}/sae_explanations/
+    """
+    slug = model_slug(model_id)
+    return Path(base_dir) / slug / width / "sae_explanations"
 
 
 def resolve_sp1_dir(base_dir: Path, cand_method: str) -> tuple:

@@ -1,3 +1,135 @@
+#Indonesian language
+# # ═══════════════════════════════════════════════════════════════
+# # Model & SAE Registry
+# # ═══════════════════════════════════════════════════════════════
+
+# models:
+#   google/gemma-2-2b:
+#     d_model: 2304
+#     n_layers: 26
+#     use_4bit: false
+#     default_layer: 7
+
+#     sae_widths:
+#       "16k":
+#         sae_release: gemma-scope-2b-pt-res-canonical
+#         sae_id_fmt: "layer_{layer}/width_16k/canonical"
+#         default_l0: null
+#         layer_l0: {}
+#       "65k":
+#         sae_release: gemma-scope-2b-pt-res
+#         sae_id_fmt: "layer_{layer}/width_65k/average_l0_{l0}"
+#         default_l0: 107
+#         layer_l0:
+#           1: 121
+#           6: 107
+#           7: 107
+#           8: 111
+#           11: 70
+#           19: 115
+
+#   google/gemma-2-9b:
+#     d_model: 3584
+#     n_layers: 42
+#     use_4bit: false
+#     default_layer: 16
+
+#     sae_widths:
+#       "16k":
+#         sae_release: gemma-scope-9b-pt-res-canonical
+#         sae_id_fmt: "layer_{layer}/width_16k/canonical"
+#         default_l0: null
+#         layer_l0: {}
+#       "131k":
+#         sae_release: gemma-scope-9b-pt-res
+#         sae_id_fmt: "layer_{layer}/width_131k/average_l0_{l0}"
+#         default_l0: 121
+#         layer_l0:
+#           3: 103
+#           8: 129
+#           11: 88
+#           13: 99
+#           14: 105
+#           18: 113
+#           35: 94
+
+#   google/gemma-2-9b-it:
+#     d_model: 3584
+#     n_layers: 42
+#     use_4bit: false
+#     default_layer: 20
+
+#     sae_widths:
+#       "16k":
+#         sae_release: gemma-scope-9b-it-res
+#         sae_id_fmt: "layer_{layer}/width_16k/average_l0_{l0}"
+#         default_l0: 91
+#         layer_l0:
+#           9: 88
+#           20: 91
+#           31: 76
+#       "131k":
+#         sae_release: gemma-scope-9b-it-res
+#         sae_id_fmt: "layer_{layer}/width_131k/average_l0_{l0}"
+#         default_l0: 81
+#         layer_l0:
+#           9: 121
+#           20: 81
+#           31: 109
+
+#   meta-llama/llama-3.1-8b:
+#     d_model: 4096
+#     n_layers: 32
+#     use_4bit: false
+#     default_layer: 20
+
+#     sae_widths:
+#       "32k":
+#         sae_release: llama_scope_lxr_8x
+#         sae_id_fmt: "l{layer}r_8x"
+#         default_l0: null
+#         layer_l0: {}
+#       "131k":
+#         sae_release: llama_scope_lxr_32x
+#         sae_id_fmt: "l{layer}r_32x"
+#         default_l0: null
+#         layer_l0: {}
+
+# # ═══════════════════════════════════════════════════════════════
+# # Layer-Emotion Maps (from probing experiments)
+# # ═══════════════════════════════════════════════════════════════
+# layer_emotion_maps:
+#   google/gemma-2-2b:
+#     1:  [disgust]
+#     6:  [sadness]
+#     7:  [anger, neutral]
+#     8:  [surprise]
+#     11: [joy]
+#     19: [fear]
+
+#   google/gemma-2-9b:
+#     3:  [anger]
+#     8:  [surprise]
+#     11: [joy]
+#     13: [fear]
+#     14: [sadness]
+#     18: [neutral]
+#     35: [disgust]
+
+#   google/gemma-2-9b-it:
+#     9:  [anger, surprise, neutral]
+#     20: [fear, joy, sadness]
+#     31: [disgust]
+
+#   meta-llama/llama-3.1-8b:
+#     0:  [neutral]
+#     4:  [fear]
+#     10: [anger, disgust]
+#     15: [surprise]
+#     24: [joy]
+#     26: [sadness]
+
+#javanese language
 # ═══════════════════════════════════════════════════════════════
 # Model & SAE Registry
 # ═══════════════════════════════════════════════════════════════
@@ -7,7 +139,7 @@ models:
     d_model: 2304
     n_layers: 26
     use_4bit: false
-    default_layer: 7
+    default_layer: 18
 
     sae_widths:
       "16k":
@@ -21,17 +153,18 @@ models:
         default_l0: 107
         layer_l0:
           1: 121
-          6: 107
-          7: 107
-          8: 111
-          11: 70
-          19: 115
+          3: 89
+          4: 89
+          13: 75
+          22: 116
+          24: 124
+          25: 93
 
   google/gemma-2-9b:
     d_model: 3584
     n_layers: 42
     use_4bit: false
-    default_layer: 16
+    default_layer: 25
 
     sae_widths:
       "16k":
@@ -45,18 +178,17 @@ models:
         default_l0: 121
         layer_l0:
           3: 103
-          8: 129
-          11: 88
+          6: 120
           13: 99
-          14: 105
-          18: 113
-          35: 94
+          37: 96
+          40: 94
+
 
   google/gemma-2-9b-it:
     d_model: 3584
     n_layers: 42
     use_4bit: false
-    default_layer: 20
+    default_layer: 24
 
     sae_widths:
       "16k":
@@ -80,7 +212,7 @@ models:
     d_model: 4096
     n_layers: 32
     use_4bit: false
-    default_layer: 20
+    default_layer: 15
 
     sae_widths:
       "32k":
@@ -99,31 +231,29 @@ models:
 # ═══════════════════════════════════════════════════════════════
 layer_emotion_maps:
   google/gemma-2-2b:
-    1:  [disgust]
-    6:  [sadness]
-    7:  [anger, neutral]
-    8:  [surprise]
-    11: [joy]
-    19: [fear]
+    1: [joy]
+    3: [neutral]
+    4: [anger]
+    13: [disgust]
+    22: [fear]
+    24: [sadness]
+    25: [surprise]
 
   google/gemma-2-9b:
-    3:  [anger]
-    8:  [surprise]
-    11: [joy]
-    13: [fear]
-    14: [sadness]
-    18: [neutral]
-    35: [disgust]
+    3:  [joy, fear, disgust]
+    6:  [sadness]
+    13: [surprise]
+    37: [anger]
+    40: [neutral]
 
   google/gemma-2-9b-it:
-    9:  [anger, surprise, neutral]
-    20: [fear, joy, sadness]
-    31: [disgust]
+    9:  [fear, surprise]
+    31: [anger, disgust, neutral, sadness, joy]
 
   meta-llama/llama-3.1-8b:
-    0:  [neutral]
-    4:  [fear]
-    10: [anger, disgust]
-    15: [surprise]
-    24: [joy]
-    26: [sadness]
+    4:  [sadness, fear]
+    5:  [neutral]
+    13: [disgust]
+    14: [joy]
+    21: [anger]
+    31: [surprise]
