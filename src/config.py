@@ -20,6 +20,7 @@ def hf_login():
       1. HF_TOKEN environment variable  (preferred — no secrets in files)
       2. hf_token field in experiment.yaml
       3. Existing huggingface-cli login cache (~/.cache/huggingface/token)
+      4. Removing the deprecated HFfolder
 
     Call this at the top of every script's main(). Subsequent calls are no-ops.
     """
