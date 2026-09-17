@@ -173,16 +173,20 @@ def run_probing(model_id, language, data_config, exp_config):
     best = probe_df.loc[probe_df["macro_f1"].idxmax()]
     print(f"\nBest layer: {best['layer_name']} (F1={best['macro_f1']:.4f})")
 
-    # === Per-emotion binary probing ===
+    # === Per-emotion binary probing (full layer × emotion matrix) ===
     print("\n== Per-Emotion Probing ==\n")
     per_emo_results = []
     layer_emo_map = defaultdict(list)
+
+    # Collect F1 for every (layer, emotion) pair — this feeds the heatmap
+    emo_layer_f1 = {emo: np.zeros(n_layers + 1) for emo in emotion_classes}
 
     for emo in emotion_classes:
         train_mask = (train_emotions == emo)
         eval_mask = (eval_emotions == emo)
 
         if train_mask.sum() == 0 or eval_mask.sum() == 0:
+            print(f"  {emo:<10} skipped (no data)")
             continue
 
         y_train_e = train_labels[train_mask]
@@ -209,6 +213,8 @@ def run_probing(model_id, language, data_config, exp_config):
             y_pred = probe.predict(X_ev_s)
             f1 = f1_score(y_eval_e, y_pred, average="macro", zero_division=0)
 
+            emo_layer_f1[emo][layer_idx] = f1
+
             if f1 > best_f1:
                 best_f1 = f1
                 best_layer = layer_idx
@@ -225,6 +231,10 @@ def run_probing(model_id, language, data_config, exp_config):
         layer_emo_map[actual_layer].append(emo)
         print(f"  {emo:<10} best={layer_name:<5} F1={best_f1:.4f}")
 
+    # Populate probe_df with the full per-emotion F1 columns for plots
+    for emo in emotion_classes:
+        probe_df[f"f1_{emo}"] = emo_layer_f1[emo]
+
     # ── Free hidden states (can be several GB) ──
     del train_states, eval_states, train_labels, eval_labels
     del train_emotions, eval_emotions, train_df, eval_df
@@ -234,6 +244,10 @@ def run_probing(model_id, language, data_config, exp_config):
     probe_df.to_csv(out_dir / "probe_results.csv", index=False)
     per_emo_df = pd.DataFrame(per_emo_results)
     per_emo_df.to_csv(out_dir / "per_emotion_probe.csv", index=False)
+
+    # Save full layer × emotion F1 matrix as its own CSV for easy inspection
+    emo_cols = ["layer_name"] + [f"f1_{e}" for e in emotion_classes]
+    probe_df[emo_cols].to_csv(out_dir / "layer_emotion_f1_matrix.csv", index=False)
 
     summary = {
         "model_id": model_id,
@@ -247,9 +261,7 @@ def run_probing(model_id, language, data_config, exp_config):
     }
     save_json(summary, out_dir / "probing_summary.json")
 
-    # Plots — add per-emo f1 columns for heatmap compatibility
-    for emo in emotion_classes:
-        probe_df[f"f1_{emo}"] = 0.0
+    # Plots
     plot_probing_results(probe_df, emotion_classes, plots_dir / "probing_f1.png")
     plot_probing_heatmap(probe_df, emotion_classes, plots_dir / "probing_heatmap.png")
 
