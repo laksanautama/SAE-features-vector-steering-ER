@@ -188,7 +188,7 @@ models:
     d_model: 3584
     n_layers: 42
     use_4bit: false
-    default_layer: 24
+    default_layer: 20
 
     sae_widths:
       "16k":

@@ -3,7 +3,7 @@
 SP-2 Coefficient Optimisation
 ===============================
 Learns steering coefficients α via gradient-based optimization.
-Runs all model × width × mode × candidate_method combinations for a language.
+Uses emotion-conditioned 2D alpha (n_emo_at_layer, n_cand) per layer.
 
 Usage:
     python scripts/run_sp2_optimization.py --language indonesia
@@ -28,7 +28,7 @@ from src.config import (load_experiment_config, load_dataset_registry, get_model
 from src.data import load_emotion_dataset, load_binary_pairs
 from src.model import load_model_and_tokenizer, free_model, get_token_ids, DEVICE
 from src.sae import load_pretrained_sae_decoder, load_candidates
-from src.steering import SharedSteeringContext
+from src.steering import MultiLayerSteeringContext
 from src.evaluation import threshold_sweep
 from src.prompt import build_binary_prompt
 from src.utils import (save_json, ensure_dir, plot_training_curves,
@@ -67,9 +67,12 @@ def forward_unsteered(ids, mask, model, yes_id, no_id):
     return (out.logits[bi, sl, yes_id] - out.logits[bi, sl, no_id]).float()
 
 
-def forward_steered(ids, mask, model, alpha_dict, V_dict, unique_layers, n_layers,
-                    yes_id, no_id):
-    with SharedSteeringContext(model, alpha_dict, V_dict, unique_layers, n_layers):
+def forward_steered(ids, mask, model, alpha_dict, V_dict, unique_layers,
+                    layer_emotion_map, emotion_to_idx, n_layers,
+                    yes_id, no_id, emo_ids):
+    with MultiLayerSteeringContext(model, alpha_dict, V_dict, unique_layers,
+                                    layer_emotion_map, emotion_to_idx, n_layers,
+                                    emo_ids=emo_ids):
         with torch.amp.autocast("cuda", dtype=torch.float16):
             out = model(input_ids=ids, attention_mask=mask)
     sl = mask.sum(dim=1) - 1
@@ -78,17 +81,22 @@ def forward_steered(ids, mask, model, alpha_dict, V_dict, unique_layers, n_layer
 
 
 def train_sp2(model, V_CAND, INDICES, train_batches, eval_batches, unique_layers,
-              n_layers, yes_id, no_id, config):
+              layer_emotion_map, emotion_to_idx, n_layers, yes_id, no_id, config):
+    # Build alpha: 2D (n_emo_at_layer, n_cand) — emotion-conditioned
     alpha_dict = {}
     V_dict = {}
     for ul_idx, layer in enumerate(unique_layers):
+        n_emo = len(layer_emotion_map[layer])
         n_cand = V_CAND[layer].shape[0]
-        alpha_dict[ul_idx] = nn.Parameter(torch.full((n_cand,), 0.01, device=DEVICE))
+        alpha_dict[ul_idx] = nn.Parameter(torch.full((n_emo, n_cand), 0.01, device=DEVICE))
         V_dict[ul_idx] = V_CAND[layer]
-        print(f"  Layer {layer:>2}: alpha ({n_cand},)")
+        print(f"  Layer {layer:>2}: alpha ({n_emo}, {n_cand}) for {layer_emotion_map[layer]}")
 
     all_params = list(alpha_dict.values())
     optimizer = Adam([{"params": all_params, "lr": config["lr"]}])
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode="min", factor=0.5, patience=3, min_lr=1e-5
+    )
 
     n_pos = sum(int((l > 0.5).sum()) for _, _, l, _, _ in train_batches)
     n_neg = sum(int((l <= 0.5).sum()) for _, _, l, _, _ in train_batches)
@@ -108,7 +116,8 @@ def train_sp2(model, V_CAND, INDICES, train_batches, eval_batches, unique_layers
 
     total_params = sum(a.numel() for a in all_params)
     print(f"\n  Training: {epochs} epochs, lr={config['lr']}, lam={lam}")
-    print(f"  Total params: {total_params}, pos_weight={pos_weight.item():.2f}")
+    print(f"  Total alpha params: {total_params}")
+    print(f"  pos_weight: {pos_weight.item():.2f}, patience: {pat}")
 
     for ep in range(epochs):
         ep_loss = 0.0
@@ -116,7 +125,9 @@ def train_sp2(model, V_CAND, INDICES, train_batches, eval_batches, unique_layers
         for ids, mask, labels, emo_ids, layer_ids in train_batches:
             optimizer.zero_grad()
             scores = forward_steered(ids, mask, model, alpha_dict, V_dict,
-                                     unique_layers, n_layers, yes_id, no_id)
+                                     unique_layers, layer_emotion_map,
+                                     emotion_to_idx, n_layers, yes_id, no_id,
+                                     emo_ids)
             l1 = sum(F.softplus(a).sum() for a in all_params)
             loss = loss_fn(scores, labels) + lam * l1
             loss.backward()
@@ -130,7 +141,9 @@ def train_sp2(model, V_CAND, INDICES, train_batches, eval_batches, unique_layers
         with torch.no_grad():
             for ids, mask, labels, emo_ids, layer_ids in eval_batches:
                 scores = forward_steered(ids, mask, model, alpha_dict, V_dict,
-                                         unique_layers, n_layers, yes_id, no_id)
+                                         unique_layers, layer_emotion_map,
+                                         emotion_to_idx, n_layers, yes_id, no_id,
+                                         emo_ids)
                 el += loss_fn(scores, labels).item()
                 ne += 1
         el = el / max(ne, 1)
@@ -155,14 +168,17 @@ def train_sp2(model, V_CAND, INDICES, train_batches, eval_batches, unique_layers
             no_imp += 1
             mk = f" ({no_imp}/{pat})"
 
+        scheduler.step(el)
+        current_lr = optimizer.param_groups[0]["lr"]
+
         print(f"  Epoch {ep + 1:>3}/{epochs}  train={tl:.4f}  eval={el:.4f}  "
-              f"nnz={nnz:>5}  L1={l1v:.4f}{mk}")
+              f"nnz={nnz:>5}  L1={l1v:.4f}  lr={current_lr:.6f}{mk}")
 
         if no_imp >= pat:
             print(f"\n  Early stopping at epoch {ep + 1}")
             break
 
-    print(f"  Restoring best from epoch {best_ep}")
+    print(f"\n  Restoring best from epoch {best_ep} (eval_loss={best_loss:.4f})")
     return best_alpha, V_dict, history
 
 
@@ -175,7 +191,7 @@ def run_sp2(model_id, width, language, data_config, exp_config, mode, cand_metho
     emotion_classes = data_config["emotion_classes"]
     emotion_to_idx = {e: i for i, e in enumerate(emotion_classes)}
 
-    # Resolve layers
+    # Resolve layers — single-layer gets all emotions at one layer
     unique_layers, lem, emo_to_layer = resolve_layers(model_id, mode)
     if mode == "single":
         model_cfg = get_model_config(model_id)
@@ -189,7 +205,7 @@ def run_sp2(model_id, width, language, data_config, exp_config, mode, cand_metho
     sp2_dir = ensure_dir(base_dir / cand_method / f"sp2_{mode_tag}")
     plots_dir = ensure_dir(sp2_dir / "plots")
 
-    # Candidate paths — new directory structure
+    # Candidate paths
     if cand_method == "classifier-based":
         sp1_subdir = "classifier-based/sp1_classifier"
     else:
@@ -202,13 +218,11 @@ def run_sp2(model_id, width, language, data_config, exp_config, mode, cand_metho
     print(f"  Output: {sp2_dir}")
     print(f"{'='*60}")
 
-    # Check candidates exist
     for l, p in sp1_paths.items():
         if not p.exists():
             print(f"  SKIPPED: candidates missing at {p}")
             return None
 
-    # Load candidates
     CANDS = {}
     INDICES = {}
     for layer in unique_layers:
@@ -217,18 +231,16 @@ def run_sp2(model_id, width, language, data_config, exp_config, mode, cand_metho
         INDICES[layer] = [f["index"] for f in cands]
         print(f"  Layer {layer:>2}: {len(cands)} candidates")
 
-    # Load model
     model, tokenizer = load_model_and_tokenizer(model_id)
     n_layers = model.config.num_hidden_layers
     yes_id, no_id = get_token_ids(tokenizer)
 
-    # Load SAE decoders
     V_CAND = {}
     for layer in unique_layers:
         V_CAND[layer] = load_pretrained_sae_decoder(
             model_id, width, layer, INDICES[layer])
 
-    # Load data — train from train split, eval from eval split
+    # Load data — train from TRAIN split, eval from EVAL split
     train_df, _ = load_binary_pairs(data_config, config.get("max_train_samples", 500),
                                      split_name="train")
     eval_df, _ = load_binary_pairs(data_config, config.get("max_eval_samples", 100))
@@ -242,10 +254,10 @@ def run_sp2(model_id, width, language, data_config, exp_config, mode, cand_metho
 
     print(f"  Train: {len(train_batches)} batches, Eval: {len(eval_batches)} batches")
 
-    # Train
+    # Train — passes lem (layer_emotion_map) and emotion_to_idx
     alpha_star, V_dict, train_history = train_sp2(
         model, V_CAND, INDICES, train_batches, eval_batches,
-        unique_layers, n_layers, yes_id, no_id, config)
+        unique_layers, lem, emotion_to_idx, n_layers, yes_id, no_id, config)
 
     # Evaluate
     print("\n  Collecting scores ...")
@@ -255,7 +267,8 @@ def run_sp2(model_id, width, language, data_config, exp_config, mode, cand_metho
         for ids, mask, labels, emo_ids, layer_ids in eval_batches:
             all_su.append(forward_unsteered(ids, mask, model, yes_id, no_id).cpu())
             all_ss.append(forward_steered(ids, mask, model, alpha_dev, V_dict,
-                                          unique_layers, n_layers, yes_id, no_id).cpu())
+                                          unique_layers, lem, emotion_to_idx,
+                                          n_layers, yes_id, no_id, emo_ids).cpu())
             all_lb.append(labels.cpu())
 
     all_su = torch.cat(all_su).numpy()
@@ -330,7 +343,6 @@ def main():
                     except Exception as e:
                         print(f"\n  ERROR: {model_id}/{width}/{mode}/{cand_method}: {e}")
                         import traceback; traceback.print_exc()
-                        # Ensure cleanup even on error
                         gc.collect()
                         if torch.cuda.is_available():
                             torch.cuda.empty_cache()

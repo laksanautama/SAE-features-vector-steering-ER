@@ -27,12 +27,13 @@ from src.utils import save_json, ensure_dir
 
 
 def build_task_prompt(language, emotion_classes):
+    emotions_str = ", ".join(emotion_classes)
     return (
-        f"{language.title()} language text. "
-        f"Bahasa {language.title()}. "
-        f"{language.title()} cultural context, social norms, and local expressions. "
-        f"Text written in {language.title()} or about {language.title()} topics. "
-        f"Southeast Asian cultural and linguistic patterns."
+        f"Detecting and recognising human emotions expressed in {language} text. "
+        f"The target emotions are: {emotions_str}. "
+        f"Cultural norms, social context, idiomatic expressions, politeness strategies, "
+        f"indirect speech, and community-specific emotional displays in {language} "
+        f"are important for correctly interpreting emotional cues."
     )
 
 
