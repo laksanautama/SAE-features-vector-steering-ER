@@ -24,7 +24,7 @@ from src.config import (load_experiment_config, load_dataset_registry, get_model
                          get_width_config, get_sae_id, model_slug, resolve_output_dir,
                          resolve_layers, hf_login)
 from src.data import load_binary_pairs
-from src.model import load_model_and_tokenizer, free_model, get_token_ids, DEVICE
+from src.model import load_model_and_tokenizer, free_model, get_token_ids, DEVICE, clear_hf_cache
 from src.sae import load_pretrained_sae_decoder, load_candidates
 from src.prompt import build_binary_prompt
 from src.evaluation import threshold_sweep
@@ -263,6 +263,7 @@ def main():
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
+    clear_hf_cache()
 
     print(f"\n  Analysis saved to {analysis_dir}")
 

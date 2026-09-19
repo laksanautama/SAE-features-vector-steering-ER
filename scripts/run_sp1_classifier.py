@@ -27,7 +27,7 @@ import sys; sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src.config import (load_experiment_config, load_dataset_registry, get_model_config,
                          get_sae_id, get_width_config, model_slug, resolve_output_dir,
                          resolve_layers, hf_login)
-from src.model import load_model_and_tokenizer, free_model, DEVICE
+from src.model import load_model_and_tokenizer, free_model, DEVICE, clear_hf_cache
 from src.sae import load_sae_encoder
 from src.utils import save_json, ensure_dir
 
@@ -305,11 +305,14 @@ def main():
                 except Exception as e:
                     print(f"\n  ERROR: {model_id}/{width}/{mode}: {e}")
                     import traceback; traceback.print_exc()
-                    # Ensure cleanup even on error
                     gc.collect()
                     if torch.cuda.is_available():
                         torch.cuda.empty_cache()
                     continue
+
+        # ── Clear HF cache after all widths/modes for this model ──
+        clear_hf_cache()
+        print(f"  Cache cleared after model: {model_id}")
 
     print("\n\nAll classifier SP-1 experiments complete.")
 

@@ -26,7 +26,7 @@ from src.config import (load_experiment_config, load_dataset_registry, get_model
                          get_width_config, get_sae_id, model_slug, resolve_output_dir,
                          resolve_layers, get_layer_emotion_map, hf_login)
 from src.data import load_emotion_dataset, load_binary_pairs
-from src.model import load_model_and_tokenizer, free_model, get_token_ids, DEVICE
+from src.model import load_model_and_tokenizer, free_model, get_token_ids, DEVICE, clear_hf_cache
 from src.sae import load_pretrained_sae_decoder, load_candidates
 from src.steering import MultiLayerSteeringContext
 from src.evaluation import threshold_sweep
@@ -347,6 +347,10 @@ def main():
                         if torch.cuda.is_available():
                             torch.cuda.empty_cache()
                         continue
+
+        # ── Clear HF cache after all widths/modes/methods for this model ──
+        clear_hf_cache()
+        print(f"  Cache cleared after model: {model_id}")
 
     print("\n\nAll SP-2 experiments complete.")
 
