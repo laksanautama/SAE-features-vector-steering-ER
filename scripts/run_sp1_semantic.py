@@ -79,9 +79,9 @@ def run_sp1_for_config(model_id, width, language, data_config, exp_config, mode)
     sae_expl_dir = resolve_sae_explns_dir(exp_config["output_dir"], model_id, width)
 
     # Resolve layers
-    unique_layers, lem, _ = resolve_layers(model_id, mode)
+    unique_layers, lem, _ = resolve_layers(model_id, mode, language=language)
     if mode == "single":
-        model_cfg = get_model_config(model_id)
+        model_cfg = get_model_config(model_id, language=language)
         unique_layers = [model_cfg.get("default_layer", 0)]
 
     out_dir = ensure_dir(base_dir / "semantic-based" / "sp1_semantic")
@@ -146,8 +146,18 @@ def run_sp1_for_config(model_id, width, language, data_config, exp_config, mode)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run semantic SP-1 feature selection")
+    parser = argparse.ArgumentParser(
+        description="Run semantic SP-1 feature selection",
+        epilog="Examples:\n"
+               "  python scripts/run_sp1_semantic.py --language indonesia\n"
+               "  python scripts/run_sp1_semantic.py --language indonesia --model google/gemma-2-2b --width 65k --mode single\n",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument("--language", required=True)
+    parser.add_argument("--model", default=None, help="Run only this model (e.g., google/gemma-2-2b)")
+    parser.add_argument("--width", default=None, help="Run only this width (e.g., 16k)")
+    parser.add_argument("--mode", default=None, choices=["single", "multi"],
+                        help="Run only this layer mode")
     args = parser.parse_args()
 
     exp_config = load_experiment_config()
@@ -156,10 +166,16 @@ def main():
 
     hf_login()
 
-    for model_id in exp_config["models"]:
-        widths = exp_config.get("model_widths", {}).get(model_id, ["16k"])
+    models = [args.model] if args.model else exp_config["models"]
+
+    for model_id in models:
+        all_widths = exp_config.get("model_widths", {}).get(model_id, ["16k"])
+        widths = [args.width] if args.width else all_widths
+        all_modes = exp_config.get("layer_modes", ["single", "multi"])
+        modes = [args.mode] if args.mode else all_modes
+
         for width in widths:
-            for mode in exp_config.get("layer_modes", ["single", "multi"]):
+            for mode in modes:
                 try:
                     run_sp1_for_config(
                         model_id, width, args.language, data_config, exp_config, mode)

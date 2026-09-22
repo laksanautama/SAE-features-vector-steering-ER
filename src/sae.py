@@ -15,7 +15,7 @@ from src.config import get_sae_id, get_width_config
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
-def load_pretrained_sae_decoder(model_id: str, width: str, layer: int,
+def load_pretrained_sae_decoder(model_id: str, width: str, layer: int, language: str = None,
                                  indices: list = None):
     """
     Load W_dec from a pre-trained SAE (Neuronpedia/Gemma Scope).
@@ -23,8 +23,8 @@ def load_pretrained_sae_decoder(model_id: str, width: str, layer: int,
     Returns:
         V_cand: Tensor (n_features, d_model)
     """
-    wcfg = get_width_config(model_id, width)
-    sae_id = get_sae_id(model_id, width, layer)
+    wcfg = get_width_config(model_id, width, language=language)
+    sae_id = get_sae_id(model_id, width, layer, language=language)
     print(f"    SAE: {sae_id}")
 
     sae, _, _ = SAE.from_pretrained(
@@ -78,15 +78,15 @@ def load_candidates(path: Path) -> list:
     return cands
 
 
-def load_sae_encoder(model_id: str, width: str, layer: int, d_model: int):
+def load_sae_encoder(model_id: str, width: str, layer: int, d_model: int, language: str = None):
     """
     Load SAE encoder for activation extraction.
 
     Returns:
         (sae_encoder, sae_b_dec) — nn.Linear + bias tensor
     """
-    wcfg = get_width_config(model_id, width)
-    sae_id = get_sae_id(model_id, width, layer)
+    wcfg = get_width_config(model_id, width, language=language)
+    sae_id = get_sae_id(model_id, width, layer, language=language)
     sae_obj, _, _ = SAE.from_pretrained(
         release=wcfg["sae_release"], sae_id=sae_id, device=DEVICE,
     )

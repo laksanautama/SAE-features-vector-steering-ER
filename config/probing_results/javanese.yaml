@@ -1,0 +1,58 @@
+# ═══════════════════════════════════════════════════════════════
+# Probing Results — Javanese
+# ═══════════════════════════════════════════════════════════════
+
+default_layers:
+  google/gemma-2-2b: 18
+  google/gemma-2-9b: 25
+  google/gemma-2-9b-it: 20
+  meta-llama/llama-3.1-8b: 15
+
+layer_emotion_maps:
+  google/gemma-2-2b:
+    1:  [joy]
+    3:  [neutral]
+    4:  [anger]
+    13: [disgust]
+    22: [fear]
+    24: [sadness]
+    25: [surprise]
+
+  google/gemma-2-9b:
+    3:  [joy, fear, disgust]
+    6:  [sadness]
+    13: [surprise]
+    37: [anger]
+    40: [neutral]
+
+  google/gemma-2-9b-it:
+    9:  [fear, surprise]
+    31: [anger, disgust, neutral, sadness, joy]
+
+  meta-llama/llama-3.1-8b:
+    4:  [sadness, fear]
+    5:  [neutral]
+    13: [disgust]
+    14: [joy]
+    21: [anger]
+    31: [surprise]
+
+layer_l0_overrides:
+  google/gemma-2-2b:
+    "65k":
+      1: 121
+      3: 89
+      4: 89
+      13: 75
+      18: 117       # ← default_layer — was missing before!
+      22: 116
+      24: 124
+      25: 93
+  google/gemma-2-9b:
+    "131k":
+      3: 103
+      6: 120
+      13: 99
+      25: 121       # ← default_layer — was missing before!
+      37: 96
+      40: 94

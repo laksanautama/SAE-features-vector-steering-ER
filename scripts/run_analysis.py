@@ -15,7 +15,6 @@ import json
 import numpy as np
 import pandas as pd
 import torch
-import torch.nn.functional as F
 from pathlib import Path
 from sklearn.metrics import f1_score
 
@@ -26,6 +25,7 @@ from src.config import (load_experiment_config, load_dataset_registry, get_model
 from src.data import load_binary_pairs
 from src.model import load_model_and_tokenizer, free_model, get_token_ids, DEVICE, clear_hf_cache
 from src.sae import load_pretrained_sae_decoder, load_candidates
+from src.steering import SelectiveSteeringContext
 from src.prompt import build_binary_prompt
 from src.evaluation import threshold_sweep
 from src.utils import (save_json, load_json, ensure_dir, plot_training_curves,
@@ -37,41 +37,33 @@ def forward_unsteered(ids, mask, model, yes_id, no_id):
     with torch.amp.autocast("cuda", dtype=torch.float16):
         out = model(input_ids=ids, attention_mask=mask)
     sl = mask.sum(dim=1) - 1
-    bi = torch.arange(ids.size(0), device=DEVICE)
+    bi = torch.arange(ids.size(0), device=ids.device)
     return (out.logits[bi, sl, yes_id] - out.logits[bi, sl, no_id]).float()
 
 
-def forward_with_active_layers(ids, mask, model, alpha_star, V_CAND, INDICES,
-                                unique_layers, active_layers, n_layers, yes_id, no_id):
+def forward_with_active_layers(ids, mask, model, alpha_dict, V_dict,
+                                unique_layers, active_layers, n_layers,
+                                yes_id, no_id, emo_ids_batch=None,
+                                layer_emotion_map=None, emotion_to_idx=None):
+    """
+    Forward pass with steering applied only at `active_layers`.
+    Uses SelectiveSteeringContext which handles both 1D and 2D alpha,
+    multi-GPU device placement, and emotion-conditioned routing.
+    """
     if not active_layers:
         return forward_unsteered(ids, mask, model, yes_id, no_id)
 
-    handles = []
-    for ul_idx, layer_j in enumerate(unique_layers):
-        if layer_j not in active_layers:
-            continue
-        a = alpha_star[ul_idx].to(DEVICE)
-        V = V_CAND[layer_j]
-
-        def make_hook(a_l, V_l):
-            def fn(module, args):
-                h = args[0]
-                ap = F.softplus(a_l).to(dtype=V_l.dtype)
-                delta = torch.matmul(ap, V_l).to(dtype=h.dtype)
-                return (h + delta.unsqueeze(0).unsqueeze(0),) + args[1:]
-            return fn
-
-        nxt = layer_j + 1
-        target = model.model.layers[nxt] if nxt < n_layers else model.model.norm
-        handles.append(target.register_forward_pre_hook(make_hook(a, V)))
-
-    with torch.amp.autocast("cuda", dtype=torch.float16):
-        out = model(input_ids=ids, attention_mask=mask)
-    for h in handles:
-        h.remove()
+    with SelectiveSteeringContext(
+        model, alpha_dict, V_dict, unique_layers, active_layers, n_layers,
+        emo_ids=emo_ids_batch,
+        layer_emotion_map=layer_emotion_map,
+        emotion_to_idx=emotion_to_idx,
+    ):
+        with torch.amp.autocast("cuda", dtype=torch.float16):
+            out = model(input_ids=ids, attention_mask=mask)
 
     sl = mask.sum(dim=1) - 1
-    bi = torch.arange(ids.size(0), device=DEVICE)
+    bi = torch.arange(ids.size(0), device=ids.device)
     return (out.logits[bi, sl, yes_id] - out.logits[bi, sl, no_id]).float()
 
 
@@ -100,9 +92,9 @@ def main():
     emotion_to_idx = {e: i for i, e in enumerate(emotion_classes)}
 
     base_dir = resolve_output_dir(exp_config["output_dir"], model_id, width, args.language)
-    unique_layers_raw, lem, emo_to_layer = resolve_layers(model_id, mode)
+    unique_layers_raw, lem, emo_to_layer = resolve_layers(model_id, mode, language=args.language)
     if mode == "single":
-        model_cfg = get_model_config(model_id)
+        model_cfg = get_model_config(model_id, language=args.language)
         dl = model_cfg.get("default_layer", 0)
         unique_layers_raw = [dl]
 
@@ -152,11 +144,15 @@ def main():
     n_layers_model = model.config.num_hidden_layers
     yes_id, no_id = get_token_ids(tokenizer)
 
-    # Load SAE decoders
+    # Load SAE decoders — keyed by ul_idx to match SelectiveSteeringContext
     V_CAND = {}
-    for layer in UNIQUE_LAYERS:
-        V_CAND[layer] = load_pretrained_sae_decoder(
-            model_id, width, layer, INDICES.get(layer))
+    for ul_idx, layer in enumerate(UNIQUE_LAYERS):
+        V_CAND[ul_idx] = load_pretrained_sae_decoder(
+            model_id, width, layer, language=args.language, indices=INDICES.get(layer))
+
+    # Rebuild layer_emotion_map from saved data
+    saved_lem = save_dict.get("layer_emotion_map", {})
+    layer_emotion_map = {int(k): v for k, v in saved_lem.items()} if saved_lem else None
 
     # Load eval data
     eval_df, _ = load_binary_pairs(data_config, sp2_cfg.get("max_eval_samples", 100))
@@ -189,8 +185,11 @@ def main():
         with torch.no_grad():
             for ids, mask, labels, emo_ids in eval_batches:
                 s = forward_with_active_layers(
-                    ids, mask, model, alpha_star, V_CAND, INDICES,
-                    UNIQUE_LAYERS, active, n_layers_model, yes_id, no_id).cpu()
+                    ids, mask, model, alpha_star, V_CAND,
+                    UNIQUE_LAYERS, active, n_layers_model, yes_id, no_id,
+                    emo_ids_batch=emo_ids,
+                    layer_emotion_map=layer_emotion_map,
+                    emotion_to_idx=emotion_to_idx).cpu()
                 scores_list.append(s)
                 labels_list.append(labels.cpu())
         all_scores[name] = torch.cat(scores_list).numpy()

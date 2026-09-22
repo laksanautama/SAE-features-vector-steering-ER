@@ -1,137 +1,27 @@
-#Indonesian language
-# # ═══════════════════════════════════════════════════════════════
-# # Model & SAE Registry
-# # ═══════════════════════════════════════════════════════════════
-
-# models:
-#   google/gemma-2-2b:
-#     d_model: 2304
-#     n_layers: 26
-#     use_4bit: false
-#     default_layer: 7
-
-#     sae_widths:
-#       "16k":
-#         sae_release: gemma-scope-2b-pt-res-canonical
-#         sae_id_fmt: "layer_{layer}/width_16k/canonical"
-#         default_l0: null
-#         layer_l0: {}
-#       "65k":
-#         sae_release: gemma-scope-2b-pt-res
-#         sae_id_fmt: "layer_{layer}/width_65k/average_l0_{l0}"
-#         default_l0: 107
-#         layer_l0:
-#           1: 121
-#           6: 107
-#           7: 107
-#           8: 111
-#           11: 70
-#           19: 115
-
-#   google/gemma-2-9b:
-#     d_model: 3584
-#     n_layers: 42
-#     use_4bit: false
-#     default_layer: 16
-
-#     sae_widths:
-#       "16k":
-#         sae_release: gemma-scope-9b-pt-res-canonical
-#         sae_id_fmt: "layer_{layer}/width_16k/canonical"
-#         default_l0: null
-#         layer_l0: {}
-#       "131k":
-#         sae_release: gemma-scope-9b-pt-res
-#         sae_id_fmt: "layer_{layer}/width_131k/average_l0_{l0}"
-#         default_l0: 121
-#         layer_l0:
-#           3: 103
-#           8: 129
-#           11: 88
-#           13: 99
-#           14: 105
-#           18: 113
-#           35: 94
-
-#   google/gemma-2-9b-it:
-#     d_model: 3584
-#     n_layers: 42
-#     use_4bit: false
-#     default_layer: 20
-
-#     sae_widths:
-#       "16k":
-#         sae_release: gemma-scope-9b-it-res
-#         sae_id_fmt: "layer_{layer}/width_16k/average_l0_{l0}"
-#         default_l0: 91
-#         layer_l0:
-#           9: 88
-#           20: 91
-#           31: 76
-#       "131k":
-#         sae_release: gemma-scope-9b-it-res
-#         sae_id_fmt: "layer_{layer}/width_131k/average_l0_{l0}"
-#         default_l0: 81
-#         layer_l0:
-#           9: 121
-#           20: 81
-#           31: 109
-
-#   meta-llama/llama-3.1-8b:
-#     d_model: 4096
-#     n_layers: 32
-#     use_4bit: false
-#     default_layer: 20
-
-#     sae_widths:
-#       "32k":
-#         sae_release: llama_scope_lxr_8x
-#         sae_id_fmt: "l{layer}r_8x"
-#         default_l0: null
-#         layer_l0: {}
-#       "131k":
-#         sae_release: llama_scope_lxr_32x
-#         sae_id_fmt: "l{layer}r_32x"
-#         default_l0: null
-#         layer_l0: {}
-
-# # ═══════════════════════════════════════════════════════════════
-# # Layer-Emotion Maps (from probing experiments)
-# # ═══════════════════════════════════════════════════════════════
-# layer_emotion_maps:
-#   google/gemma-2-2b:
-#     1:  [disgust]
-#     6:  [sadness]
-#     7:  [anger, neutral]
-#     8:  [surprise]
-#     11: [joy]
-#     19: [fear]
-
-#   google/gemma-2-9b:
-#     3:  [anger]
-#     8:  [surprise]
-#     11: [joy]
-#     13: [fear]
-#     14: [sadness]
-#     18: [neutral]
-#     35: [disgust]
-
-#   google/gemma-2-9b-it:
-#     9:  [anger, surprise, neutral]
-#     20: [fear, joy, sadness]
-#     31: [disgust]
-
-#   meta-llama/llama-3.1-8b:
-#     0:  [neutral]
-#     4:  [fear]
-#     10: [anger, disgust]
-#     15: [surprise]
-#     24: [joy]
-#     26: [sadness]
-
-#javanese language
 # ═══════════════════════════════════════════════════════════════
 # Model & SAE Registry
+# ═══════════════════════════════════════════════════════════════
+# Edit this file when switching languages. Fields to update:
+#
+#   default_layer   Best SINGLE layer for detecting ALL emotions
+#                   (from probing). Used when mode=single.
+#                   → Must have an L0 entry in layer_l0 for each
+#                     non-canonical SAE width.
+#
+#   layer_l0        L0 values for each layer you use (both
+#                   default_layer AND all layers in layer_emotion_maps).
+#                   Find correct values with:
+#                     python scripts/discover_l0.py --model MODEL --width WIDTH
+#
+#   layer_emotion_maps
+#                   Best layer PER EMOTION (from probing).
+#                   Used when mode=multi: each emotion is steered
+#                   at its own best layer independently.
+#                   → Every layer listed here must have an L0 entry
+#                     in layer_l0 for non-canonical widths.
+#
+# Optionally, config/probing_results/{language}.yaml can override
+# these values (if present, it takes priority over this file).
 # ═══════════════════════════════════════════════════════════════
 
 models:
@@ -139,23 +29,24 @@ models:
     d_model: 2304
     n_layers: 26
     use_4bit: false
-    default_layer: 18
+    default_layer: 12      # ← mode=single: best overall layer (update per language)
 
     sae_widths:
       "16k":
         sae_release: gemma-scope-2b-pt-res-canonical
         sae_id_fmt: "layer_{layer}/width_16k/canonical"
-        default_l0: null
+        default_l0: null    # canonical — no L0 needed
         layer_l0: {}
       "65k":
         sae_release: gemma-scope-2b-pt-res
         sae_id_fmt: "layer_{layer}/width_65k/average_l0_{l0}"
-        default_l0: 107
-        layer_l0:
+        default_l0: 107     # fallback if layer not in layer_l0
+        layer_l0:           # ← must cover default_layer + all layer_emotion_maps layers
           1: 121
           3: 89
           4: 89
           13: 75
+          18: 117           # default_layer
           22: 116
           24: 124
           25: 93
@@ -180,9 +71,9 @@ models:
           3: 103
           6: 120
           13: 99
+          25: 121
           37: 96
           40: 94
-
 
   google/gemma-2-9b-it:
     d_model: 3584
@@ -229,6 +120,13 @@ models:
 # ═══════════════════════════════════════════════════════════════
 # Layer-Emotion Maps (from probing experiments)
 # ═══════════════════════════════════════════════════════════════
+# Used by mode=multi. Each emotion is steered at its own best layer.
+# Keys = layer numbers, values = list of emotions best detected there.
+# Every emotion must appear exactly once across all layers.
+#
+# After editing, run discover_l0.py for any NEW layers to get
+# correct L0 values for layer_l0 above.
+
 layer_emotion_maps:
   google/gemma-2-2b:
     1: [joy]

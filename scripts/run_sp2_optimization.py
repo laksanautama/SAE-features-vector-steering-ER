@@ -63,7 +63,7 @@ def forward_unsteered(ids, mask, model, yes_id, no_id):
     with torch.amp.autocast("cuda", dtype=torch.float16):
         out = model(input_ids=ids, attention_mask=mask)
     sl = mask.sum(dim=1) - 1
-    bi = torch.arange(ids.size(0), device=DEVICE)
+    bi = torch.arange(ids.size(0), device=ids.device)
     return (out.logits[bi, sl, yes_id] - out.logits[bi, sl, no_id]).float()
 
 
@@ -76,21 +76,36 @@ def forward_steered(ids, mask, model, alpha_dict, V_dict, unique_layers,
         with torch.amp.autocast("cuda", dtype=torch.float16):
             out = model(input_ids=ids, attention_mask=mask)
     sl = mask.sum(dim=1) - 1
-    bi = torch.arange(ids.size(0), device=DEVICE)
+    bi = torch.arange(ids.size(0), device=ids.device)
     return (out.logits[bi, sl, yes_id] - out.logits[bi, sl, no_id]).float()
 
 
 def train_sp2(model, V_CAND, INDICES, train_batches, eval_batches, unique_layers,
               layer_emotion_map, emotion_to_idx, n_layers, yes_id, no_id, config):
+    # Find the device each hooked layer lives on (matters for multi-GPU)
+    def _hook_target_device(model, layer_j, n_layers):
+        nxt = layer_j + 1
+        target = (model.model.layers[nxt] if nxt < n_layers
+                  else model.model.norm)
+        # Get device from the first parameter of the hook target module
+        try:
+            return next(target.parameters()).device
+        except StopIteration:
+            return DEVICE
+
     # Build alpha: 2D (n_emo_at_layer, n_cand) — emotion-conditioned
+    # Pin each alpha+V to the device where its hook target lives,
+    # so .to(dev) inside the hook is a no-op and avoids cross-GPU transfers.
     alpha_dict = {}
     V_dict = {}
     for ul_idx, layer in enumerate(unique_layers):
+        target_dev = _hook_target_device(model, layer, n_layers)
         n_emo = len(layer_emotion_map[layer])
         n_cand = V_CAND[layer].shape[0]
-        alpha_dict[ul_idx] = nn.Parameter(torch.full((n_emo, n_cand), 0.01, device=DEVICE))
-        V_dict[ul_idx] = V_CAND[layer]
-        print(f"  Layer {layer:>2}: alpha ({n_emo}, {n_cand}) for {layer_emotion_map[layer]}")
+        alpha_dict[ul_idx] = nn.Parameter(torch.full((n_emo, n_cand), 0.01, device=target_dev))
+        V_dict[ul_idx] = V_CAND[layer].to(target_dev)
+        print(f"  Layer {layer:>2}: alpha ({n_emo}, {n_cand}) on {target_dev} "
+              f"for {layer_emotion_map[layer]}")
 
     all_params = list(alpha_dict.values())
     optimizer = Adam([{"params": all_params, "lr": config["lr"]}])
@@ -192,9 +207,9 @@ def run_sp2(model_id, width, language, data_config, exp_config, mode, cand_metho
     emotion_to_idx = {e: i for i, e in enumerate(emotion_classes)}
 
     # Resolve layers — single-layer gets all emotions at one layer
-    unique_layers, lem, emo_to_layer = resolve_layers(model_id, mode)
+    unique_layers, lem, emo_to_layer = resolve_layers(model_id, mode, language=language)
     if mode == "single":
-        model_cfg = get_model_config(model_id)
+        model_cfg = get_model_config(model_id, language=language)
         dl = model_cfg.get("default_layer", 0)
         unique_layers = [dl]
         emo_to_layer = {e: dl for e in emotion_classes}
@@ -238,7 +253,7 @@ def run_sp2(model_id, width, language, data_config, exp_config, mode, cand_metho
     V_CAND = {}
     for layer in unique_layers:
         V_CAND[layer] = load_pretrained_sae_decoder(
-            model_id, width, layer, INDICES[layer])
+            model_id, width, layer, language=language, indices=INDICES[layer])
 
     # Load data — train from TRAIN split, eval from EVAL split
     train_df, _ = load_binary_pairs(data_config, config.get("max_train_samples", 500),
@@ -322,8 +337,25 @@ def run_sp2(model_id, width, language, data_config, exp_config, mode, cand_metho
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run SP-2 coefficient optimisation")
+    parser = argparse.ArgumentParser(
+        description="Run SP-2 coefficient optimisation",
+        epilog="Examples:\n"
+               "  python scripts/run_sp2_optimization.py --language indonesia\n"
+               "  python scripts/run_sp2_optimization.py --language indonesia "
+               "--model google/gemma-2-2b --width 65k --mode single "
+               "--cand_method semantic-based\n",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument("--language", required=True)
+    parser.add_argument("--model", default=None,
+                        help="Run only this model (e.g., google/gemma-2-2b)")
+    parser.add_argument("--width", default=None,
+                        help="Run only this width (e.g., 16k)")
+    parser.add_argument("--mode", default=None, choices=["single", "multi"],
+                        help="Run only this layer mode")
+    parser.add_argument("--cand_method", default=None,
+                        choices=["semantic-based", "classifier-based"],
+                        help="Run only this candidate method")
     args = parser.parse_args()
 
     exp_config = load_experiment_config()
@@ -332,11 +364,19 @@ def main():
 
     hf_login()
 
-    for model_id in exp_config["models"]:
-        widths = exp_config.get("model_widths", {}).get(model_id, ["16k"])
+    models = [args.model] if args.model else exp_config["models"]
+
+    for model_id in models:
+        all_widths = exp_config.get("model_widths", {}).get(model_id, ["16k"])
+        widths = [args.width] if args.width else all_widths
+        all_modes = exp_config.get("layer_modes", ["single", "multi"])
+        modes = [args.mode] if args.mode else all_modes
+        all_methods = exp_config.get("candidate_methods", ["semantic-based"])
+        methods = [args.cand_method] if args.cand_method else all_methods
+
         for width in widths:
-            for mode in exp_config.get("layer_modes", ["single", "multi"]):
-                for cand_method in exp_config.get("candidate_methods", ["semantic-based"]):
+            for mode in modes:
+                for cand_method in methods:
                     try:
                         run_sp2(model_id, width, args.language,
                                 data_config, exp_config, mode, cand_method)

@@ -1,0 +1,59 @@
+# ═══════════════════════════════════════════════════════════════
+# Probing Results — Sundanese
+# ═══════════════════════════════════════════════════════════════
+
+default_layers:
+  google/gemma-2-2b: 12
+  google/gemma-2-9b: 35
+  google/gemma-2-9b-it: 20
+  meta-llama/llama-3.1-8b: 18
+
+layer_emotion_maps:
+  google/gemma-2-2b:
+    0:  [fear, neutral]
+    1:  [sadness, surprise]
+    6:  [joy]
+    21: [anger]
+    23: [disgust]
+
+  google/gemma-2-9b:
+    0:  [fear, neutral]
+    4:  [anger]
+    5:  [disgust]
+    8:  [sadness]
+    20: [surprise]  
+    40: [joy]
+
+  google/gemma-2-9b-it:
+    9:  [neutral, disgust, fear, joy]
+    20: [anger, sadness]
+    31: [surprise]
+
+  meta-llama/llama-3.1-8b:
+    2:  [fear]
+    4:  [neutral]
+    5:  [surprise]
+    8:  [anger]
+    12: [joy]
+    28: [disgust]
+    31: [sadness]
+
+layer_l0_overrides:
+  google/gemma-2-2b:
+    "65k":
+      0: 73
+      1: 121
+      6: 107
+      12: 72
+      21: 111
+      23: 123
+      
+  google/gemma-2-9b:
+    "131k":
+      0: 41
+      4: 101
+      5: 94
+      8: 129       # ← default_layer — was missing before!
+      20: 114
+      35: 94
+      40: 94 
